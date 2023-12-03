@@ -1,0 +1,190 @@
+{% extends 'layout.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="container-fluid ">
+    <div class="d-flex flex-row justify-content-between ">
+        <div class="align-self-center">
+            Name: {{user.empid}} - Role: {{user.user_role}}
+        </div>
+        <div>
+            <button type="button" onclick="logout()" class="btn btn-outline-secondary m-2">Logout</button>
+            {% if user.user_role == 'admin'%}
+            <button type="button" onclick="window.location.href='/add_user'" class="btn btn-outline-secondary m-2">Create User</button>
+            {% endif%}
+        </div>
+    </div>
+    <div class="card shadow mb-5"></div>
+    <!-- list of employees -->
+    {% if user.user_role == 'admin'%}
+    <table id="LOE" class="table table-dark col-10 mx-auto mt-5">
+        <thead>
+            <tr>
+                <th scope="col">#</th>
+                <th scope="col">Employee ID</th>
+                <th scope="col">Volunteer Time</th>
+                <th scope="col">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+
+        </tbody>
+    </table>
+    {% else %}
+    <div class="card col-6 mx-auto">
+        <div class="card-header">
+            <div class="display-6">
+                Account Details
+            </div>
+        </div>
+        <div class="card-body d-flex justify-content-between">
+            <div>
+                Employee ID: {{ user.empid }}<br>
+                Employee Time Volunteering: <span id="employeeHours"></span>
+            </div>
+            <!-- <div>
+                <button type="button" class="btn btn-success h-100 " onclick="open_dialog_user()">Submit Hours</button>
+            </div> -->
+        </div>
+    </div>
+    {%endif%}
+
+</div>
+
+<script>
+    function logout() {
+        $.ajax({
+            url: '/logout',
+            method: 'POST',
+            success: function (_) {
+                window.location.reload();
+            }
+        });
+    }
+    $(document).ready(() => {
+        $('#employeeHours').html(`${moment.duration('{{user.hours}}', 'hours').humanize()} ({{user.hours}} Hours)`);
+    });
+</script>
+
+
+{% if user.user_role == 'admin'%}
+<script>
+    const date_format = 'YYYY-MM-DD HH:mm:ss';
+    $('#LOE').ready(() => {
+        $.ajax({
+            url: '/listOfEmployees',
+            method: 'GET',
+            success: (data) => {
+                data.forEach(employee => {
+                    let duration = employee.hours === 0 ? employee.hours : moment.duration(employee.hours, 'hours').humanize() + ` (${employee.hours} Hours)`;
+                    $('#LOE tbody').append(`
+                            <tr>
+                                <th scope="row">${employee.id}</th>
+                                <td>${employee.empid}</td>
+                                <td>${duration}</td>
+                                <td><button class="btn btn-primary" onclick="open_dialog_admin(${employee.empid},${employee.hours})">Edit Hours</button></td>
+                            </tr>`);
+                });
+            }
+
+        });
+    });
+
+    function open_dialog_admin(empid, hours) {
+        swal({
+            text: `Add or subtract working Hours for employee number [${empid}].`,
+            content: {
+                element: "input",
+                attributes: {
+                    placeholder: hours,
+                    type: "number",
+                    value: hours
+                },
+            },
+            button: {
+                text: "Submit"
+            }
+        })
+            .then(newHours => {
+                if (!newHours) throw null;
+                data = {
+                    empid: empid,
+                    newHours: newHours
+                };
+                return $.ajax({
+                    url: '/submitHours',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                })
+            }).then(results => {
+                if (results.OK === true) {
+                    swal("Done Nice!", "Ajax Response Success", 'success')
+                    window.location.reload();
+                } else {
+                    throw Error;
+                }
+            }).catch(err => {
+                if (err) {
+                    swal("Error :(", 'Ajax Response Error', 'error');
+                } else {
+                    swal.stopLoading();
+                    swal.close();
+                }
+
+            });
+
+    }
+</script>
+{%else%}
+<script>
+    function open_dialog_user() {
+        swal({
+            text: `Submit Hours for today.`,
+            content: {
+                element: "input",
+                attributes: {
+                    placeholder: 0,
+                    type: "number",
+                    max: 24,
+                    min: 0,
+                    value: 0
+                },
+            },
+            button: {
+                text: "Submit"
+            }
+        })
+            .then(newHours => {
+                if (!newHours) throw null;
+                data = {
+                    newHours: newHours
+                };
+                return $.ajax({
+                    url: '/submitHours',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(data),
+                })
+            }).then(results => {
+                if (results.OK === true) {
+                    swal("Done Nice!", "Ajax Response Success", 'success')
+                    window.location.reload();
+                } else {
+                    throw Error;
+                }
+            }).catch(err => {
+                if (err) {
+                    swal("Error :(", 'Ajax Response Error', 'error');
+                } else {
+                    swal.stopLoading();
+                    swal.close();
+                }
+
+            });
+
+    }
+</script>
+{%endif%}
+{% endblock %}
